@@ -1,0 +1,111 @@
+---
+title: "Final project"
+author: "Fengyuan Hu"
+date: "May 7, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(quantmod)
+library(ggplot2)
+library(tidyverse)
+library(rvest)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r NBEV}
+NBEV<-getSymbols("NBEV", src = "yahoo", from ="2016-08-01", to = "2019-05-05",auto.assign = FALSE )
+
+summary(NBEV)
+```
+
+```{r stock price plot}
+ggplot(NBEV,aes(x=index(NBEV),y=NBEV[,6]))+
+  geom_line(color = "darkgreen")+ggtitle("Price series of New Age Beverage")+xlab("Date")+
+  ylab("Price")+theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r Moving average plot}
+NBEV_ma<-subset(NBEV,index(NBEV) >="2018-05-05")
+NBEV_ma10<-rollmean(NBEV_ma[,6],10, fill = list(NA,NULL,NA),align = "right")
+NBEV_ma30<-rollmean(NBEV_ma[,6],30, fill = list(NA,NULL,NA),align = "right")
+NBEV_ma$ma10 <-coredata(NBEV_ma10)
+NBEV_ma$ma30 <-coredata(NBEV_ma30)
+ggplot(NBEV_ma, aes(x= index(NBEV_ma)))+
+  geom_line(aes(y=NBEV_ma[,6],color="NBEV"))+ggtitle("New Age Beverage price series")+
+  geom_line(aes(y=NBEV_ma$ma10,color="MA10"))+
+  geom_line(aes(y=NBEV_ma$ma30,color="MA30"))+xlab("Date")+ylab("Price")+
+  theme(plot.title = element_text(hjust = 0.5), panel.border =element_blank())+
+  scale_x_date(date_labels = "%b %y", date_breaks = "3 months")+
+  scale_color_manual("Series", values=c("NBEV"="blue","MA10"="red","MA30"="black"))
+
+```
+
+```{r Rate of return summary}
+NBEV_ret <-diff(log(NBEV[,6]))
+NBEV_ret <-NBEV_ret[-1,]
+summary(NBEV_ret)
+
+```
+
+```{r Rate of return plot1}
+ggplot(NBEV_ret, aes(x=index(NBEV_ret), y= NBEV_ret))+
+  geom_line(color= "deepskyblue4")+
+  ggtitle("New Age Beverage return series")+
+  xlab("Date")+ ylab("Return")+
+  theme(plot.title = element_text(hjust = 0.5))+scale_x_date(date_labels = "%b %y", date_breaks = "3 months")
+
+```
+
+```{r Rate of return plot2}
+NBEV_ret18 <- subset(NBEV_ret, index(NBEV_ret) > "2018-09-01")
+ggplot(NBEV_ret18, aes(x=index(NBEV_ret18), y= NBEV_ret18))+
+  geom_line(color= "deepskyblue4")+
+  ggtitle("New Age Beverage return series in 2018")+
+  xlab("Date")+ ylab("Return")+
+  theme(plot.title = element_text(hjust = 0.5))+scale_x_date(date_labels = "%b %y", date_breaks = "1 months")
+```
+
+```{r Scraping from Yahoo and balance sheet plot}
+url <- "https://finance.yahoo.com/quote/NBEV/balance-sheet?p=NBEV"
+NBEV1<-url %>%
+    read_html()%>%
+    html_nodes("table")%>%
+    html_table(fill = TRUE)%>%
+    .[[1]]
+names(NBEV1)<-c(" ","12/31/2018","12/31/2017","12/31/2016","12/31/2015")
+row.names(NBEV1)<-NBEV1$` `
+NBEV1<-NBEV1[-1,-1]
+NBEV1<-(t(NBEV1))
+NBEV1<-data.frame(NBEV1)
+NBEV1$Total.Assets <- as.numeric(gsub('[$,]', '', NBEV1$Total.Assets))
+NBEV1$Total.Liabilities <- as.numeric(gsub('[$,]', '', NBEV1$Total.Liabilities))
+NBEV1$Net.Tangible.Assets <- as.numeric(gsub('[$,]', '', NBEV1$Net.Tangible.Assets))
+options(scipen=200)
+NBEV1<-NBEV1[ORDER(NBEV1$Total.Assets),]
+ggplot(NBEV1,aes(x=index(NBEV1),group = 1))+
+  geom_line(aes(y=NBEV1$Total.Assets,color="Total.Assets"))+
+  geom_line(aes(y=NBEV1$Total.Liabilities,color="Total.Liabilities"))+
+  geom_line(aes(y=NBEV1$Net.Tangible.Assets,color="Net.Tangible.Assets"))+
+  xlab("Date")+ ylab("Value")+ggtitle("New Age Beverage Balance Sheet")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  scale_color_manual("variable", values=c("Total.Assets"="red","Total.Liabilities"="darkgreen","Net.Tangible.Assets"="bLUE"))
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
